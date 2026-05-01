@@ -16,106 +16,161 @@
         input:focus { border-color: var(--binance-yellow); outline: none; }
         .hide-ui .action-btn, .hide-ui #tab-container, .hide-ui .btn-yellow, .hide-ui .tab-controls { display: none !important; }
         .collapsible-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
-        .open .collapsible-content { max-height: 500px; }
+        .open .collapsible-content { max-height: 1000px; }
         .rotate-icon { transition: transform 0.3s; }
         .open .rotate-icon { transform: rotate(180deg); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        .summary-table { width: 100%; border-collapse: collapse; font-size: 10px; min-width: 650px; }
+        .summary-table th { color: #848e9c; text-align: left; padding: 12px 6px; border-bottom: 1px solid #2b3139; text-transform: uppercase; }
+        .summary-table td { padding: 12px 6px; border-bottom: 1px solid #2b3139; vertical-align: middle; }
+        .breakdown-row { background-color: #161a1e; display: none; }
+        .breakdown-row.show { display: table-row; }
+        .detail-header { color: #5e6673; font-weight: 700; border-bottom: 1px solid #2b3139; }
     </style>
 </head>
 <body class="p-4" id="main-body">
 
-    <!-- Tab Container with Reordering -->
+    <!-- Tab Navigation -->
     <div class="flex overflow-x-auto gap-2 mb-4 border-b border-gray-800 no-scrollbar" id="tab-container"></div>
 
-    <div class="flex justify-between items-center mb-4">
-        <input type="text" id="coin-ticker" class="text-xl font-bold bg-transparent w-1/2 uppercase" onchange="renameTab(this.value)" placeholder="BTCUSDT">
-        <button onclick="fetchBinancePrice()" class="action-btn p-2 binance-card text-[10px] text-yellow-400 font-bold">⚡ SYNC PRICE</button>
-    </div>
-
-    <!-- Summary Card -->
-    <div class="binance-card p-4 mb-6 shadow-xl border-l-4 border-yellow-400">
-        <div class="grid grid-cols-2 gap-4">
-            <div><p class="text-[10px] text-gray-400 uppercase">Avg Price</p><p id="res-avg" class="text-2xl font-bold text-yellow-400">$0.00</p></div>
-            <div class="text-right"><p class="text-[10px] text-gray-400 uppercase">Total Cost</p><p id="res-cost" class="text-xl font-semibold">$0.00</p></div>
-            <div><p class="text-[10px] text-gray-400 uppercase">Total Qty</p><p id="res-shares" class="font-medium text-gray-200">0.00</p></div>
-            <div class="text-right"><p class="text-[10px] text-gray-400 uppercase">Profit/Loss</p><p id="res-pl" class="font-bold">--</p></div>
+    <div id="coin-header-ui">
+        <div class="flex justify-between items-center mb-4">
+            <input type="text" id="coin-ticker" class="text-xl font-bold bg-transparent w-1/2 uppercase" onchange="renameTab(this.value)" placeholder="BTCUSDT">
+            <button onclick="fetchBinancePrice()" class="action-btn p-2 binance-card text-[10px] text-yellow-400 font-bold uppercase">SYNC PRICE</button>
         </div>
-        <div class="mt-4 pt-4 border-t border-gray-700">
-            <input type="number" id="current-price" placeholder="Market Price" class="w-full text-center font-bold text-lg" oninput="calculate()">
-            <p id="status-msg" class="text-[9px] text-center mt-1 text-gray-500">BINANCE SPOT DATA</p>
+
+        <!-- Main Stats Card -->
+        <div class="binance-card p-4 mb-6 shadow-xl border-l-4 border-yellow-400">
+            <div class="grid grid-cols-2 gap-4">
+                <div><p class="text-[10px] text-gray-400 uppercase">Avg Price</p><p id="res-avg" class="text-2xl font-bold text-yellow-400">$0.00</p></div>
+                <div class="text-right"><p class="text-[10px] text-gray-400 uppercase">Total Cost</p><p id="res-cost" class="text-xl font-semibold">$0.00</p></div>
+                <div><p class="text-[10px] text-gray-400 uppercase">Total Qty</p><p id="res-shares" class="font-medium text-gray-200">0.00</p></div>
+                <div class="text-right"><p class="text-[10px] text-gray-400 uppercase">Profit/Loss</p><p id="res-pl" class="font-bold">--</p></div>
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-700">
+                <input type="number" id="current-price" placeholder="Market Price" class="w-full text-center font-bold text-lg" oninput="calculate()">
+                <p id="status-msg" class="text-[9px] text-center mt-1 text-gray-500">READY</p>
+            </div>
+        </div>
+
+        <!-- Mode Switcher -->
+        <div class="flex gap-2 mb-4 action-btn">
+            <button onclick="setMode('overall')" id="btn-mode-overall" class="flex-1 py-2 rounded text-xs binance-card border border-yellow-500">Overall</button>
+            <button onclick="setMode('ladder')" id="btn-mode-ladder" class="flex-1 py-2 rounded text-xs binance-card">Ladder</button>
         </div>
     </div>
 
-    <!-- Mode Switcher -->
-    <div class="flex gap-2 mb-4 action-btn">
-        <button onclick="setMode('overall')" id="btn-mode-overall" class="flex-1 py-2 rounded text-xs binance-card border border-yellow-500">Overall</button>
-        <button onclick="setMode('ladder')" id="btn-mode-ladder" class="flex-1 py-2 rounded text-xs binance-card">Ladder</button>
-    </div>
-
-    <!-- Main View -->
+    <!-- Overall View (Inputs) -->
     <div id="entries-view">
         <div id="entry-list" class="space-y-3 mb-4"></div>
         <button onclick="addEntry()" class="btn-yellow w-full py-4 rounded-xl shadow-lg action-btn">+ Add Entry</button>
-        
-        <div class="grid grid-cols-2 gap-2 mt-4 action-btn">
-            <button onclick="addNewTab()" class="binance-card py-2 text-[10px] uppercase">+ New Tab</button>
-            <button onclick="screenshotMode()" class="binance-card py-2 text-[10px] uppercase">📷 Shot</button>
-            <button onclick="exportJSON()" class="binance-card py-2 text-[10px] uppercase border border-blue-900">💾 Backup</button>
-            <button onclick="triggerRestore()" class="binance-card py-2 text-[10px] uppercase border border-green-900">📂 Restore</button>
-        </div>
-        <input type="file" id="restore-file" class="hidden" accept=".json" onchange="importJSON(event)">
     </div>
 
+    <!-- Ladder View -->
     <div id="analysis-view" class="hidden space-y-4"></div>
 
-    <script>
-        let state = { activeTabIndex: 0, tabs: [{ name: 'BTCUSDT', entries: [{ price: '', qty: '' }], currentPrice: '' }], mode: 'overall' };
+    <!-- Summary View -->
+    <div id="summary-view" class="hidden">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold text-yellow-400">Portfolio Summary</h2>
+            <button onclick="syncAllPrices()" class="bg-gray-800 text-yellow-400 px-4 py-2 rounded text-[10px] uppercase font-bold">Update All Prices</button>
+        </div>
+        <div class="overflow-x-auto binance-card p-2">
+            <table class="summary-table">
+                <thead>
+                    <tr>
+                        <th>Coin</th>
+                        <th>Qty</th>
+                        <th>Avg Entry</th>
+                        <th>Invested</th>
+                        <th>Market</th>
+                        <th>Value</th>
+                        <th>PnL</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="summary-table-body"></tbody>
+            </table>
+        </div>
+    </div>
 
-        function init() {
-            const saved = localStorage.getItem('ladder_binance_v1');
-            if (saved) state = JSON.parse(saved);
-            renderTabs();
-            render();
-        }
+    <!-- Universal Actions -->
+    <div class="grid grid-cols-2 gap-2 mt-6 action-btn">
+        <button onclick="addNewTab()" class="binance-card py-3 text-[10px] uppercase">+ New Tab</button>
+        <button onclick="screenshotMode()" class="binance-card py-3 text-[10px] uppercase">📷 Snapshot</button>
+        <button onclick="exportJSON()" class="binance-card py-3 text-[10px] uppercase border border-blue-900">💾 Backup Data</button>
+        <button onclick="triggerRestore()" class="binance-card py-3 text-[10px] uppercase border border-green-900">📂 Restore Data</button>
+    </div>
+    <input type="file" id="restore-file" class="hidden" accept=".json" onchange="importJSON(event)">
+
+    <script>
+        let state = { 
+            activeTabIndex: 0, 
+            tabs: [
+                { name: 'BTCUSDT', entries: [{ price: '', qty: '' }], currentPrice: '', isSummary: false },
+                { name: 'SUMMARY', entries: [], currentPrice: '', isSummary: true }
+            ], 
+            mode: 'overall' 
+        };
 
         function save() { localStorage.setItem('ladder_binance_v1', JSON.stringify(state)); }
 
-        // --- TAB REORDERING LOGIC ---
-        function moveTab(index, direction) {
-            const newIndex = index + direction;
-            if (newIndex < 0 || newIndex >= state.tabs.length) return;
-            
-            // Swap tabs
-            const temp = state.tabs[index];
-            state.tabs[index] = state.tabs[newIndex];
-            state.tabs[newIndex] = temp;
-            
-            // Adjust active tab index to follow the moved tab
-            if (state.activeTabIndex === index) {
-                state.activeTabIndex = newIndex;
-            } else if (state.activeTabIndex === newIndex) {
-                state.activeTabIndex = index;
+        function init() {
+            const saved = localStorage.getItem('ladder_binance_v1');
+            if (saved) {
+                state = JSON.parse(saved);
+                if (!state.tabs.some(t => t.isSummary)) {
+                    state.tabs.push({ name: 'SUMMARY', entries: [], currentPrice: '', isSummary: true });
+                }
             }
-            
-            save();
             renderTabs();
+            render();
         }
 
         function renderTabs() {
             document.getElementById('tab-container').innerHTML = state.tabs.map((tab, i) => `
                 <div class="flex flex-col items-center min-w-[100px] border-r border-gray-800 last:border-0">
                     <div onclick="switchTab(${i})" class="pb-1 whitespace-nowrap px-2 cursor-pointer font-bold text-sm ${state.activeTabIndex === i ? 'tab-active' : 'text-gray-500'}">
-                        ${tab.name}
+                        ${tab.isSummary ? '📊 ' + tab.name : tab.name}
                     </div>
-                    <div class="flex gap-2 pb-1 tab-controls">
+                    <div class="flex gap-4 pb-1 tab-controls">
                         <button onclick="moveTab(${i}, -1)" class="text-[10px] text-gray-600 hover:text-yellow-400 ${i === 0 ? 'invisible' : ''}">←</button>
                         <button onclick="moveTab(${i}, 1)" class="text-[10px] text-gray-600 hover:text-yellow-400 ${i === state.tabs.length - 1 ? 'invisible' : ''}">→</button>
                     </div>
                 </div>`).join('');
-            document.getElementById('coin-ticker').value = state.tabs[state.activeTabIndex].name;
-            document.getElementById('current-price').value = state.tabs[state.activeTabIndex].currentPrice;
+            
+            const activeTab = state.tabs[state.activeTabIndex];
+            if(!activeTab.isSummary) {
+                document.getElementById('coin-ticker').value = activeTab.name;
+                document.getElementById('current-price').value = activeTab.currentPrice;
+            }
         }
 
-        // --- BINANCE API ---
+        function switchTab(i) { state.activeTabIndex = i; renderTabs(); render(); }
+        
+        function addNewTab() { 
+            state.tabs.splice(state.tabs.length - 1, 0, { name: 'NEW COIN', entries: [{ price: '', qty: '' }], currentPrice: '', isSummary: false });
+            state.activeTabIndex = state.tabs.length - 2; 
+            save(); renderTabs(); render(); 
+        }
+
+        function moveTab(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= state.tabs.length) return;
+            const temp = state.tabs[index];
+            state.tabs[index] = state.tabs[newIndex];
+            state.tabs[newIndex] = temp;
+            state.activeTabIndex = (state.activeTabIndex === index) ? newIndex : (state.activeTabIndex === newIndex ? index : state.activeTabIndex);
+            save(); renderTabs();
+        }
+
+        function renameTab(val) { 
+            if(state.tabs[state.activeTabIndex].isSummary) return;
+            state.tabs[state.activeTabIndex].name = val.toUpperCase() || 'COIN'; 
+            save(); renderTabs(); 
+        }
+
         async function fetchBinancePrice() {
             const ticker = state.tabs[state.activeTabIndex].name.toUpperCase().trim();
             const status = document.getElementById('status-msg');
@@ -125,28 +180,30 @@
                 const data = await response.json();
                 if (data.price) {
                     document.getElementById('current-price').value = parseFloat(data.price);
-                    status.innerText = `UPDATED: ${new Date().toLocaleTimeString()}`;
+                    status.innerText = `SYNCED`;
                     status.style.color = "var(--binance-green)";
                     calculate();
                     save();
-                } else { throw "Invalid Symbol"; }
-            } catch (err) {
-                status.innerText = "ERROR: PAIR NOT FOUND";
-                status.style.color = "var(--binance-red)";
-            }
+                }
+            } catch (err) { status.innerText = "ERROR"; status.style.color = "var(--binance-red)"; }
         }
 
-        // --- CORE FUNCTIONS ---
-        function switchTab(i) { state.activeTabIndex = i; renderTabs(); render(); }
-        function addNewTab() { state.tabs.push({ name: 'NEW COIN', entries: [{ price: '', qty: '' }], currentPrice: '' }); state.activeTabIndex = state.tabs.length - 1; save(); renderTabs(); render(); }
-        function renameTab(val) { state.tabs[state.activeTabIndex].name = val.toUpperCase() || 'BTCUSDT'; save(); renderTabs(); }
-        function setMode(m) { state.mode = m; ['overall', 'ladder'].forEach(x => document.getElementById(`btn-mode-${x}`).classList.toggle('border-yellow-500', x === m)); render(); }
-        function addEntry() { state.tabs[state.activeTabIndex].entries.push({ price: '', qty: '' }); render(); save(); }
-        function updateEntry(i, f, v) { state.tabs[state.activeTabIndex].entries[i][f] = v; calculate(); save(); }
-        function removeEntry(i) { state.tabs[state.activeTabIndex].entries.splice(i, 1); render(); save(); }
+        async function syncAllPrices() {
+            for (let tab of state.tabs) {
+                if (!tab.isSummary && tab.name !== 'NEW COIN') {
+                    try {
+                        const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${tab.name.toUpperCase().trim()}`);
+                        const data = await response.json();
+                        if (data.price) tab.currentPrice = data.price;
+                    } catch(e) {}
+                }
+            }
+            save(); renderSummaryTable();
+        }
 
         function calculate() {
             const tab = state.tabs[state.activeTabIndex];
+            if (tab.isSummary) return;
             tab.currentPrice = document.getElementById('current-price').value;
             let totalCost = 0, totalQty = 0;
             tab.entries.forEach(e => {
@@ -155,132 +212,191 @@
             });
             const avg = totalQty > 0 ? (totalCost / totalQty) : 0;
             const current = parseFloat(tab.currentPrice) || 0;
-            document.getElementById('res-avg').innerText = `$${avg.toLocaleString(undefined, {maximumFractionDigits: 6})}`;
+            document.getElementById('res-avg').innerText = `$${avg.toLocaleString(undefined, {maximumFractionDigits: 4})}`;
             document.getElementById('res-cost').innerText = `$${totalCost.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
             document.getElementById('res-shares').innerText = totalQty.toLocaleString();
             const plEl = document.getElementById('res-pl');
             if (current > 0 && avg > 0) {
                 const diff = ((current - avg) / avg) * 100;
-                plEl.innerText = `${diff > 0 ? '+' : ''}${diff.toFixed(2)}%`;
+                plEl.innerText = `${diff >= 0 ? '+' : ''}${diff.toFixed(2)}%`;
                 plEl.style.color = diff >= 0 ? 'var(--binance-green)' : 'var(--binance-red)';
-            } else { plEl.innerText = '--'; plEl.style.color = 'inherit'; }
-            if (state.mode === 'ladder') updateLadderLiveCalculations(current);
+            } else { plEl.innerText = '--'; }
+            if (state.mode === 'ladder') renderLadder(tab);
         }
 
-        // --- LADDER RENDER & TOOLS ---
-        function toggleStep(id) { document.getElementById(id).classList.toggle('open'); }
+        function toggleBreakdown(idx) {
+            const row = document.getElementById(`breakdown-${idx}`);
+            row.classList.toggle('show');
+        }
 
-        function updateLadderLiveCalculations(current) {
-            const entries = state.tabs[state.activeTabIndex].entries.filter(e => e.price > 0 && e.qty > 0).sort((a, b) => a.price - b.price);
-            entries.forEach((e, i) => {
-                const p = parseFloat(e.price);
-                const q = parseFloat(e.qty);
-                const plVal = (current - p) * q;
-                const plPerc = ((current - p) / p) * 100;
-                const display = document.getElementById(`step-pl-${i}`);
-                if (display && current > 0) {
-                    display.innerText = `${plVal >= 0 ? 'Profit' : 'Loss'}: $${plVal.toFixed(2)} (${plPerc.toFixed(2)}%)`;
-                    display.style.color = plVal >= 0 ? 'var(--binance-green)' : 'var(--binance-red)';
-                }
+        function renderSummaryTable() {
+            const tbody = document.getElementById('summary-table-body');
+            let html = "";
+            state.tabs.forEach((tab, index) => {
+                if (tab.isSummary) return;
+                let tCost = 0, tQty = 0;
+                tab.entries.forEach(e => {
+                    tCost += (parseFloat(e.price) || 0) * (parseFloat(e.qty) || 0);
+                    tQty += (parseFloat(e.qty) || 0);
+                });
+                const avg = tQty > 0 ? tCost / tQty : 0;
+                const current = parseFloat(tab.currentPrice) || 0;
+                const value = tQty * current;
+                const pnlVal = current > 0 ? value - tCost : 0;
+                const pnlPerc = (tCost > 0 && current > 0) ? (pnlVal / tCost) * 100 : 0;
+                html += `
+                    <tr class="font-bold border-b border-gray-800">
+                        <td class="text-yellow-400">${tab.name}</td>
+                        <td>${tQty.toLocaleString()}</td>
+                        <td>$${avg.toFixed(4)}</td>
+                        <td>$${tCost.toFixed(2)}</td>
+                        <td>$${current.toFixed(4)}</td>
+                        <td>$${value.toFixed(2)}</td>
+                        <td class="${pnlVal >= 0 ? 'text-[#2ebd85]' : 'text-[#f6465d]'}">${pnlPerc.toFixed(2)}%<br>$${pnlVal.toFixed(2)}</td>
+                        <td><button onclick="toggleBreakdown(${index})" class="bg-gray-700 px-2 py-1 rounded text-[8px] uppercase">Details</button></td>
+                    </tr>
+                    <tr id="breakdown-${index}" class="breakdown-row">
+                        <td colspan="8" class="p-0">
+                            <div class="bg-[#0b0e11] border-l-4 border-yellow-500 p-2 overflow-x-auto">
+                                <table class="w-full text-[9px] text-gray-300">
+                                    <tr class="detail-header">
+                                        <td class="p-2">Entry #</td><td>Qty</td><td>Avg Entry</td><td>Invested</td><td>Market</td><td>Value</td><td>PnL</td>
+                                    </tr>
+                                    ${tab.entries.map((e, ei) => {
+                                        const ep = parseFloat(e.price) || 0;
+                                        const eq = parseFloat(e.qty) || 0;
+                                        const eInv = ep * eq;
+                                        const eVal = eq * current;
+                                        const ePnlV = current > 0 ? eVal - eInv : 0;
+                                        const ePnlP = (eInv > 0 && current > 0) ? (ePnlV / eInv) * 100 : 0;
+                                        return `<tr class="border-b border-gray-800">
+                                            <td class="p-2 text-gray-500">Entry ${ei+1}</td>
+                                            <td>${eq.toLocaleString()}</td>
+                                            <td>$${ep.toFixed(4)}</td>
+                                            <td>$${eInv.toFixed(2)}</td>
+                                            <td>$${current.toFixed(4)}</td>
+                                            <td>$${eVal.toFixed(2)}</td>
+                                            <td class="${ePnlV >= 0 ? 'text-[#2ebd85]' : 'text-[#f6465d]'}">${ePnlP.toFixed(2)}% ($${ePnlV.toFixed(2)})</td>
+                                        </tr>`;
+                                    }).join('')}
+                                </table>
+                            </div>
+                        </td>
+                    </tr>`;
             });
+            tbody.innerHTML = html || '<tr><td colspan="8" class="text-center py-4 text-gray-500">No coins added yet</td></tr>';
         }
 
-        function calcCustomPrice(stepIdx, targetPrice, buyPrice, qty) {
-            const resEl = document.getElementById(`custom-price-res-${stepIdx}`);
-            const p = parseFloat(targetPrice);
-            if (!p || p <= 0) { resEl.innerText = "--"; return; }
-            const diff = p - buyPrice;
-            const perc = (diff / buyPrice) * 100;
-            const total = diff * qty;
-            resEl.innerText = `${total >= 0 ? 'Profit' : 'Loss'}: $${total.toFixed(2)} (${perc.toFixed(2)}%)`;
-            resEl.style.color = total >= 0 ? 'var(--binance-green)' : 'var(--binance-red)';
+        function render() {
+            const tab = state.tabs[state.activeTabIndex];
+            document.getElementById('coin-header-ui').style.display = tab.isSummary ? 'none' : 'block';
+            document.getElementById('entries-view').style.display = (!tab.isSummary && state.mode === 'overall') ? 'block' : 'none';
+            document.getElementById('analysis-view').style.display = (!tab.isSummary && state.mode === 'ladder') ? 'block' : 'none';
+            document.getElementById('summary-view').style.display = tab.isSummary ? 'block' : 'none';
+
+            if (tab.isSummary) renderSummaryTable();
+            else if (state.mode === 'overall') {
+                document.getElementById('entry-list').innerHTML = tab.entries.map((e, i) => `
+                    <div class="binance-card p-3 flex gap-3 items-center">
+                        <div class="flex-1"><label class="text-[9px] text-gray-500 uppercase">Price</label><input type="number" step="any" value="${e.price}" oninput="updateEntry(${i}, 'price', this.value)" class="w-full"></div>
+                        <div class="flex-1"><label class="text-[9px] text-gray-500 uppercase">Qty</label><input type="number" step="any" value="${e.qty}" oninput="updateEntry(${i}, 'qty', this.value)" class="w-full"></div>
+                        <button onclick="removeEntry(${i})" class="text-red-500 text-xl px-2 font-bold">&times;</button>
+                    </div>`).join('');
+            } else { renderLadder(tab); }
         }
 
-        function calcCustomPerc(stepIdx, perc, buyPrice, qty, signId) {
-            const resEl = document.getElementById(`custom-perc-res-${stepIdx}`);
-            const sign = document.getElementById(signId).value === '+' ? 1 : -1;
-            const pVal = parseFloat(perc);
-            if (isNaN(pVal)) { resEl.innerText = "--"; return; }
-            const multiplier = 1 + (sign * (pVal / 100));
-            const targetPrice = buyPrice * multiplier;
-            const total = (targetPrice - buyPrice) * qty;
-            resEl.innerText = `Target: $${targetPrice.toFixed(4)} | PnL: $${total.toFixed(2)}`;
-            resEl.style.color = total >= 0 ? 'var(--binance-green)' : 'var(--binance-red)';
-        }
+        function setMode(m) { state.mode = m; render(); }
+        function addEntry() { state.tabs[state.activeTabIndex].entries.push({ price: '', qty: '' }); render(); save(); }
+        function updateEntry(i, f, v) { state.tabs[state.activeTabIndex].entries[i][f] = v; calculate(); save(); }
+        function removeEntry(i) { state.tabs[state.activeTabIndex].entries.splice(i, 1); render(); save(); }
+
+        function toggleStep(id) { document.getElementById(id).classList.toggle('open'); }
 
         function renderLadder(tab) {
             const view = document.getElementById('analysis-view');
+            const marketPrice = parseFloat(tab.currentPrice) || 0;
             let content = `<button onclick="setMode('overall')" class="text-yellow-400 text-xs mb-4 uppercase">← Back to Inputs</button>`;
-            let v = tab.entries.filter(e => e.price > 0 && e.qty > 0).sort((a, b) => a.price - b.price);
+            let sorted = [...tab.entries].filter(e => e.price > 0 && e.qty > 0).sort((a, b) => a.price - b.price);
             let tC = 0, tQ = 0;
-            const current = parseFloat(tab.currentPrice) || 0;
 
-            v.forEach((e, i) => {
+            sorted.forEach((e, i) => {
                 const buyPrice = parseFloat(e.price);
                 const qty = parseFloat(e.qty);
-                tC += (buyPrice * qty); tQ += qty;
+                tC += (buyPrice * qty);
+                tQ += qty;
+
+                // Market P/L for this specific step
+                const stepPlVal = marketPrice > 0 ? (marketPrice - buyPrice) * qty : 0;
+                const stepPlPerc = marketPrice > 0 ? ((marketPrice - buyPrice) / buyPrice) * 100 : 0;
+
                 content += `
                     <div id="step-container-${i}" class="binance-card border-l-2 border-yellow-500 mb-2 overflow-hidden">
                         <div onclick="toggleStep('step-container-${i}')" class="p-4 flex justify-between items-center cursor-pointer">
                             <div>
-                                <span class="text-[10px] text-gray-400">Step ${i+1} (Price: ${buyPrice})</span>
-                                <div class="text-[9px] text-gray-500 mt-1">Sum Qty: ${tQ.toLocaleString()} | Sum Cost: $${tC.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                                <span class="text-[10px] text-gray-400">Step ${i+1}: $${buyPrice.toFixed(2)} | Qty: ${qty}</span>
+                                <div class="text-[9px] text-gray-500 mt-1">Sum Qty: ${tQ.toFixed(2)} | Sum Cost: $${tC.toFixed(2)}</div>
+                                <div class="text-[10px] mt-1 font-bold ${stepPlVal >= 0 ? 'text-green-500' : 'text-red-500'}">
+                                    Current P/L: $${stepPlVal.toFixed(2)} (${stepPlPerc.toFixed(2)}%)
+                                </div>
                             </div>
                             <div class="flex items-center gap-3">
                                 <span class="text-yellow-400 font-bold text-xs">Avg: $${(tC/tQ).toFixed(4)}</span>
-                                <span class="rotate-icon text-gray-500 text-xs">▼</span>
+                                <span class="rotate-icon text-gray-500">▼</span>
                             </div>
                         </div>
                         <div class="collapsible-content bg-[#161a1e] px-4">
                             <div class="py-3 space-y-4 border-t border-gray-800">
+                                <!-- Price Calculator -->
                                 <div>
-                                    <p class="text-[10px] text-gray-400 uppercase mb-1">Live Performance (Qty: ${qty})</p>
-                                    <p id="step-pl-${i}" class="text-sm font-bold">--</p>
+                                    <p class="text-[9px] text-gray-400 uppercase">Target Price Calculator</p>
+                                    <input type="number" placeholder="Enter Target Price" class="w-full text-xs mt-1" 
+                                        oninput="calcCustomPrice(${buyPrice}, ${qty}, this.value, 'cp-${i}')">
+                                    <p id="cp-${i}" class="text-[11px] mt-1">--</p>
                                 </div>
-                                <div>
-                                    <p class="text-[10px] text-gray-400 uppercase mb-1">Simulate Target Price</p>
-                                    <input type="number" placeholder="Price" class="w-full text-xs" oninput="calcCustomPrice(${i}, this.value, ${buyPrice}, ${qty})">
-                                    <p id="custom-price-res-${i}" class="text-[11px] mt-1 font-medium">--</p>
-                                </div>
-                                <div>
-                                    <p class="text-[10px] text-gray-400 uppercase mb-1">Simulate Target %</p>
-                                    <div class="flex gap-2">
-                                        <select id="sign-${i}" onchange="calcCustomPerc(${i}, document.getElementById('perc-in-${i}').value, ${buyPrice}, ${qty}, 'sign-${i}')">
-                                            <option value="+">+</option><option value="-">-</option>
+                                <!-- Percent Calculator -->
+                                <div class="pb-2">
+                                    <p class="text-[9px] text-gray-400 uppercase">Target % Calculator</p>
+                                    <div class="flex gap-2 mt-1">
+                                        <select id="perc-toggle-${i}" class="text-xs bg-[#2b3139]" onchange="calcCustomPerc(${buyPrice}, ${qty}, ${i})">
+                                            <option value="plus">+</option>
+                                            <option value="minus">-</option>
                                         </select>
-                                        <input id="perc-in-${i}" type="number" placeholder="%" class="flex-1 text-xs" oninput="calcCustomPerc(${i}, this.value, ${buyPrice}, ${qty}, 'sign-${i}')">
+                                        <input type="number" id="perc-input-${i}" placeholder="Percentage" class="flex-1 text-xs" 
+                                            oninput="calcCustomPerc(${buyPrice}, ${qty}, ${i})">
                                     </div>
-                                    <p id="custom-perc-res-${i}" class="text-[11px] mt-1 font-medium">--</p>
+                                    <p id="perc-res-${i}" class="text-[11px] mt-1">--</p>
                                 </div>
                             </div>
                         </div>
                     </div>`;
             });
             view.innerHTML = content;
-            updateLadderLiveCalculations(current);
         }
 
-        function render() {
-            const tab = state.tabs[state.activeTabIndex];
-            const list = document.getElementById('entry-list');
-            const analysisView = document.getElementById('analysis-view');
-            const entriesView = document.getElementById('entries-view');
-            if (state.mode === 'overall') {
-                analysisView.classList.add('hidden'); entriesView.classList.remove('hidden');
-                list.innerHTML = tab.entries.map((e, i) => `
-                    <div class="binance-card p-3 flex gap-3 items-center">
-                        <div class="flex-1"><label class="text-[9px] text-gray-500 uppercase">Price</label><input type="number" step="any" value="${e.price}" oninput="updateEntry(${i}, 'price', this.value)" class="w-full"></div>
-                        <div class="flex-1"><label class="text-[9px] text-gray-500 uppercase">Qty</label><input type="number" step="any" value="${e.qty}" oninput="updateEntry(${i}, 'qty', this.value)" class="w-full"></div>
-                        <button onclick="removeEntry(${i})" class="text-red-500 text-xl px-2 font-bold">&times;</button>
-                    </div>`).join('');
-            } else {
-                entriesView.classList.add('hidden'); analysisView.classList.remove('hidden');
-                renderLadder(tab);
-            }
-            calculate();
+        function calcCustomPrice(buy, qty, target, resId) {
+            const t = parseFloat(target);
+            const resEl = document.getElementById(resId);
+            if(!t || t <= 0) { resEl.innerText = "--"; return; }
+            const diff = t - buy;
+            const perc = (diff / buy) * 100;
+            resEl.innerText = `Result: $${(diff * qty).toFixed(2)} (${perc.toFixed(2)}%)`;
+            resEl.style.color = diff >= 0 ? 'var(--binance-green)' : 'var(--binance-red)';
         }
 
-        // --- DATA MGMT ---
+        function calcCustomPerc(buy, qty, idx) {
+            const perc = parseFloat(document.getElementById(`perc-input-${idx}`).value);
+            const toggle = document.getElementById(`perc-toggle-${idx}`).value;
+            const resEl = document.getElementById(`perc-res-${idx}`);
+            if(!perc || perc <= 0) { resEl.innerText = "--"; return; }
+            
+            const multiplier = toggle === 'plus' ? (1 + perc/100) : (1 - perc/100);
+            const targetPrice = buy * multiplier;
+            const pnl = (targetPrice - buy) * qty;
+
+            resEl.innerText = `Target Price: $${targetPrice.toFixed(4)} | P/L: $${pnl.toFixed(2)}`;
+            resEl.style.color = toggle === 'plus' ? 'var(--binance-green)' : 'var(--binance-red)';
+        }
+
         function exportJSON() {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
             const dl = document.createElement('a'); dl.setAttribute("href", dataStr); dl.setAttribute("download", `ladder_backup.json`); dl.click();
@@ -289,21 +405,30 @@
         function triggerRestore() { document.getElementById('restore-file').click(); }
 
         function importJSON(event) {
-            const file = event.target.files[0];
+            const file = event.target.files[0]; 
             if (!file) return;
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
-                    const importedState = JSON.parse(e.target.result);
-                    if (importedState.tabs) { state = importedState; save(); renderTabs(); render(); alert("Restored!"); }
-                } catch (err) { alert("Invalid Backup File"); }
+                    let imported = JSON.parse(e.target.result);
+                    if (imported.tabs) {
+                        if (!imported.tabs.some(t => t.isSummary)) {
+                            imported.tabs.push({ name: 'SUMMARY', entries: [], currentPrice: '', isSummary: true });
+                        }
+                        state = imported;
+                        save();
+                        renderTabs();
+                        render();
+                        alert("Data Restored Successfully!");
+                    }
+                } catch (err) { alert("Error reading backup file."); }
             };
             reader.readAsText(file);
         }
 
         function screenshotMode() {
             document.getElementById('main-body').classList.add('hide-ui');
-            setTimeout(() => { alert("Take Screenshot Now!"); setTimeout(() => { document.getElementById('main-body').classList.remove('hide-ui'); }, 3000); }, 100);
+            setTimeout(() => { alert("Take your screenshot now!"); setTimeout(() => { document.getElementById('main-body').classList.remove('hide-ui'); }, 3000); }, 100);
         }
 
         init();
