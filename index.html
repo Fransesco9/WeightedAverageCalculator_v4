@@ -12,9 +12,9 @@
         .binance-card { background-color: var(--binance-card); border-radius: 12px; }
         .btn-yellow { background-color: var(--binance-yellow); color: #000; font-weight: 700; }
         .tab-active { border-bottom: 3px solid var(--binance-yellow); color: var(--binance-yellow); }
-        input { background: #2b3139; border: 1px solid transparent; color: white; border-radius: 4px; padding: 8px; }
+        input, select { background: #2b3139; border: 1px solid transparent; color: white; border-radius: 4px; padding: 8px; }
         input:focus { border-color: var(--binance-yellow); outline: none; }
-        .hide-ui .action-btn, .hide-ui #tab-container, .hide-ui .btn-yellow { display: none !important; }
+        .hide-ui .action-btn, .hide-ui #tab-container, .hide-ui .btn-yellow, .hide-ui .tab-controls { display: none !important; }
         .collapsible-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
         .open .collapsible-content { max-height: 500px; }
         .rotate-icon { transition: transform 0.3s; }
@@ -23,13 +23,15 @@
 </head>
 <body class="p-4" id="main-body">
 
-    <div class="flex overflow-x-auto gap-4 mb-4 border-b border-gray-800" id="tab-container"></div>
+    <!-- Tab Container with Reordering -->
+    <div class="flex overflow-x-auto gap-2 mb-4 border-b border-gray-800 no-scrollbar" id="tab-container"></div>
 
     <div class="flex justify-between items-center mb-4">
         <input type="text" id="coin-ticker" class="text-xl font-bold bg-transparent w-1/2 uppercase" onchange="renameTab(this.value)" placeholder="BTCUSDT">
         <button onclick="fetchBinancePrice()" class="action-btn p-2 binance-card text-[10px] text-yellow-400 font-bold">⚡ SYNC PRICE</button>
     </div>
 
+    <!-- Summary Card -->
     <div class="binance-card p-4 mb-6 shadow-xl border-l-4 border-yellow-400">
         <div class="grid grid-cols-2 gap-4">
             <div><p class="text-[10px] text-gray-400 uppercase">Avg Price</p><p id="res-avg" class="text-2xl font-bold text-yellow-400">$0.00</p></div>
@@ -43,23 +45,23 @@
         </div>
     </div>
 
+    <!-- Mode Switcher -->
     <div class="flex gap-2 mb-4 action-btn">
         <button onclick="setMode('overall')" id="btn-mode-overall" class="flex-1 py-2 rounded text-xs binance-card border border-yellow-500">Overall</button>
         <button onclick="setMode('ladder')" id="btn-mode-ladder" class="flex-1 py-2 rounded text-xs binance-card">Ladder</button>
     </div>
 
+    <!-- Main View -->
     <div id="entries-view">
         <div id="entry-list" class="space-y-3 mb-4"></div>
         <button onclick="addEntry()" class="btn-yellow w-full py-4 rounded-xl shadow-lg action-btn">+ Add Entry</button>
         
-        <!-- Action Buttons Grid -->
         <div class="grid grid-cols-2 gap-2 mt-4 action-btn">
             <button onclick="addNewTab()" class="binance-card py-2 text-[10px] uppercase">+ New Tab</button>
             <button onclick="screenshotMode()" class="binance-card py-2 text-[10px] uppercase">📷 Shot</button>
             <button onclick="exportJSON()" class="binance-card py-2 text-[10px] uppercase border border-blue-900">💾 Backup</button>
             <button onclick="triggerRestore()" class="binance-card py-2 text-[10px] uppercase border border-green-900">📂 Restore</button>
         </div>
-        <!-- Hidden input for file selection -->
         <input type="file" id="restore-file" class="hidden" accept=".json" onchange="importJSON(event)">
     </div>
 
@@ -77,6 +79,43 @@
 
         function save() { localStorage.setItem('ladder_binance_v1', JSON.stringify(state)); }
 
+        // --- TAB REORDERING LOGIC ---
+        function moveTab(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= state.tabs.length) return;
+            
+            // Swap tabs
+            const temp = state.tabs[index];
+            state.tabs[index] = state.tabs[newIndex];
+            state.tabs[newIndex] = temp;
+            
+            // Adjust active tab index to follow the moved tab
+            if (state.activeTabIndex === index) {
+                state.activeTabIndex = newIndex;
+            } else if (state.activeTabIndex === newIndex) {
+                state.activeTabIndex = index;
+            }
+            
+            save();
+            renderTabs();
+        }
+
+        function renderTabs() {
+            document.getElementById('tab-container').innerHTML = state.tabs.map((tab, i) => `
+                <div class="flex flex-col items-center min-w-[100px] border-r border-gray-800 last:border-0">
+                    <div onclick="switchTab(${i})" class="pb-1 whitespace-nowrap px-2 cursor-pointer font-bold text-sm ${state.activeTabIndex === i ? 'tab-active' : 'text-gray-500'}">
+                        ${tab.name}
+                    </div>
+                    <div class="flex gap-2 pb-1 tab-controls">
+                        <button onclick="moveTab(${i}, -1)" class="text-[10px] text-gray-600 hover:text-yellow-400 ${i === 0 ? 'invisible' : ''}">←</button>
+                        <button onclick="moveTab(${i}, 1)" class="text-[10px] text-gray-600 hover:text-yellow-400 ${i === state.tabs.length - 1 ? 'invisible' : ''}">→</button>
+                    </div>
+                </div>`).join('');
+            document.getElementById('coin-ticker').value = state.tabs[state.activeTabIndex].name;
+            document.getElementById('current-price').value = state.tabs[state.activeTabIndex].currentPrice;
+        }
+
+        // --- BINANCE API ---
         async function fetchBinancePrice() {
             const ticker = state.tabs[state.activeTabIndex].name.toUpperCase().trim();
             const status = document.getElementById('status-msg');
@@ -86,28 +125,20 @@
                 const data = await response.json();
                 if (data.price) {
                     document.getElementById('current-price').value = parseFloat(data.price);
-                    status.innerText = `UPDATED FROM BINANCE: ${new Date().toLocaleTimeString()}`;
+                    status.innerText = `UPDATED: ${new Date().toLocaleTimeString()}`;
                     status.style.color = "var(--binance-green)";
                     calculate();
                     save();
                 } else { throw "Invalid Symbol"; }
             } catch (err) {
-                status.innerText = "ERROR: PAIR NOT FOUND ON BINANCE";
+                status.innerText = "ERROR: PAIR NOT FOUND";
                 status.style.color = "var(--binance-red)";
             }
         }
 
-        function renderTabs() {
-            document.getElementById('tab-container').innerHTML = state.tabs.map((tab, i) => `
-                <div onclick="switchTab(${i})" class="pb-2 whitespace-nowrap px-4 cursor-pointer font-bold ${state.activeTabIndex === i ? 'tab-active' : 'text-gray-500'}">
-                    ${tab.name}
-                </div>`).join('');
-            document.getElementById('coin-ticker').value = state.tabs[state.activeTabIndex].name;
-            document.getElementById('current-price').value = state.tabs[state.activeTabIndex].currentPrice;
-        }
-
+        // --- CORE FUNCTIONS ---
         function switchTab(i) { state.activeTabIndex = i; renderTabs(); render(); }
-        function addNewTab() { state.tabs.push({ name: 'BTCUSDT', entries: [{ price: '', qty: '' }], currentPrice: '' }); state.activeTabIndex = state.tabs.length - 1; save(); renderTabs(); render(); }
+        function addNewTab() { state.tabs.push({ name: 'NEW COIN', entries: [{ price: '', qty: '' }], currentPrice: '' }); state.activeTabIndex = state.tabs.length - 1; save(); renderTabs(); render(); }
         function renameTab(val) { state.tabs[state.activeTabIndex].name = val.toUpperCase() || 'BTCUSDT'; save(); renderTabs(); }
         function setMode(m) { state.mode = m; ['overall', 'ladder'].forEach(x => document.getElementById(`btn-mode-${x}`).classList.toggle('border-yellow-500', x === m)); render(); }
         function addEntry() { state.tabs[state.activeTabIndex].entries.push({ price: '', qty: '' }); render(); save(); }
@@ -133,16 +164,11 @@
                 plEl.innerText = `${diff > 0 ? '+' : ''}${diff.toFixed(2)}%`;
                 plEl.style.color = diff >= 0 ? 'var(--binance-green)' : 'var(--binance-red)';
             } else { plEl.innerText = '--'; plEl.style.color = 'inherit'; }
-            
-            if (state.mode === 'ladder') {
-                updateLadderLiveCalculations(current);
-            }
+            if (state.mode === 'ladder') updateLadderLiveCalculations(current);
         }
 
-        function toggleStep(id) {
-            const el = document.getElementById(id);
-            el.classList.toggle('open');
-        }
+        // --- LADDER RENDER & TOOLS ---
+        function toggleStep(id) { document.getElementById(id).classList.toggle('open'); }
 
         function updateLadderLiveCalculations(current) {
             const entries = state.tabs[state.activeTabIndex].entries.filter(e => e.price > 0 && e.qty > 0).sort((a, b) => a.price - b.price);
@@ -151,7 +177,6 @@
                 const q = parseFloat(e.qty);
                 const plVal = (current - p) * q;
                 const plPerc = ((current - p) / p) * 100;
-                
                 const display = document.getElementById(`step-pl-${i}`);
                 if (display && current > 0) {
                     display.innerText = `${plVal >= 0 ? 'Profit' : 'Loss'}: $${plVal.toFixed(2)} (${plPerc.toFixed(2)}%)`;
@@ -176,12 +201,10 @@
             const sign = document.getElementById(signId).value === '+' ? 1 : -1;
             const pVal = parseFloat(perc);
             if (isNaN(pVal)) { resEl.innerText = "--"; return; }
-            
             const multiplier = 1 + (sign * (pVal / 100));
             const targetPrice = buyPrice * multiplier;
             const total = (targetPrice - buyPrice) * qty;
-            
-            resEl.innerText = `Target: $${targetPrice.toFixed(4)} | ${total >= 0 ? 'Profit' : 'Loss'}: $${total.toFixed(2)}`;
+            resEl.innerText = `Target: $${targetPrice.toFixed(4)} | PnL: $${total.toFixed(2)}`;
             resEl.style.color = total >= 0 ? 'var(--binance-green)' : 'var(--binance-red)';
         }
 
@@ -196,38 +219,34 @@
                 const buyPrice = parseFloat(e.price);
                 const qty = parseFloat(e.qty);
                 tC += (buyPrice * qty); tQ += qty;
-                
                 content += `
                     <div id="step-container-${i}" class="binance-card border-l-2 border-yellow-500 mb-2 overflow-hidden">
                         <div onclick="toggleStep('step-container-${i}')" class="p-4 flex justify-between items-center cursor-pointer">
                             <div>
                                 <span class="text-[10px] text-gray-400">Step ${i+1} (Price: ${buyPrice})</span>
-                                <div class="text-[9px] text-gray-500 mt-1">Total Qty: ${tQ.toLocaleString()} | Total Cost: $${tC.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                                <div class="text-[9px] text-gray-500 mt-1">Sum Qty: ${tQ.toLocaleString()} | Sum Cost: $${tC.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
                             </div>
                             <div class="flex items-center gap-3">
-                                <span class="text-yellow-400 font-bold">Avg: $${(tC/tQ).toFixed(4)}</span>
+                                <span class="text-yellow-400 font-bold text-xs">Avg: $${(tC/tQ).toFixed(4)}</span>
                                 <span class="rotate-icon text-gray-500 text-xs">▼</span>
                             </div>
                         </div>
                         <div class="collapsible-content bg-[#161a1e] px-4">
                             <div class="py-3 space-y-4 border-t border-gray-800">
                                 <div>
-                                    <p class="text-[10px] text-gray-400 uppercase mb-1">Live Step Performance (Qty: ${qty})</p>
+                                    <p class="text-[10px] text-gray-400 uppercase mb-1">Live Performance (Qty: ${qty})</p>
                                     <p id="step-pl-${i}" class="text-sm font-bold">--</p>
                                 </div>
                                 <div>
                                     <p class="text-[10px] text-gray-400 uppercase mb-1">Simulate Target Price</p>
-                                    <div class="flex gap-2">
-                                        <input type="number" placeholder="Price" class="flex-1 text-xs" oninput="calcCustomPrice(${i}, this.value, ${buyPrice}, ${qty})">
-                                    </div>
+                                    <input type="number" placeholder="Price" class="w-full text-xs" oninput="calcCustomPrice(${i}, this.value, ${buyPrice}, ${qty})">
                                     <p id="custom-price-res-${i}" class="text-[11px] mt-1 font-medium">--</p>
                                 </div>
                                 <div>
                                     <p class="text-[10px] text-gray-400 uppercase mb-1">Simulate Target %</p>
                                     <div class="flex gap-2">
-                                        <select id="sign-${i}" class="bg-[#2b3139] text-white rounded px-1 text-xs" onchange="calcCustomPerc(${i}, document.getElementById('perc-in-${i}').value, ${buyPrice}, ${qty}, 'sign-${i}')">
-                                            <option value="+">+</option>
-                                            <option value="-">-</option>
+                                        <select id="sign-${i}" onchange="calcCustomPerc(${i}, document.getElementById('perc-in-${i}').value, ${buyPrice}, ${qty}, 'sign-${i}')">
+                                            <option value="+">+</option><option value="-">-</option>
                                         </select>
                                         <input id="perc-in-${i}" type="number" placeholder="%" class="flex-1 text-xs" oninput="calcCustomPerc(${i}, this.value, ${buyPrice}, ${qty}, 'sign-${i}')">
                                     </div>
@@ -261,15 +280,13 @@
             calculate();
         }
 
-        // --- BACKUP & RESTORE ---
+        // --- DATA MGMT ---
         function exportJSON() {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
-            const dl = document.createElement('a'); dl.setAttribute("href", dataStr); dl.setAttribute("download", `trade_backup_${new Date().toLocaleDateString()}.json`); dl.click();
+            const dl = document.createElement('a'); dl.setAttribute("href", dataStr); dl.setAttribute("download", `ladder_backup.json`); dl.click();
         }
 
-        function triggerRestore() {
-            document.getElementById('restore-file').click();
-        }
+        function triggerRestore() { document.getElementById('restore-file').click(); }
 
         function importJSON(event) {
             const file = event.target.files[0];
@@ -278,25 +295,15 @@
             reader.onload = function(e) {
                 try {
                     const importedState = JSON.parse(e.target.result);
-                    if (importedState.tabs && Array.isArray(importedState.tabs)) {
-                        state = importedState;
-                        save();
-                        renderTabs();
-                        render();
-                        alert("Data restored successfully!");
-                    } else {
-                        throw new Error("Invalid file format");
-                    }
-                } catch (err) {
-                    alert("Error: Could not restore data. Please ensure the file is a valid backup.");
-                }
+                    if (importedState.tabs) { state = importedState; save(); renderTabs(); render(); alert("Restored!"); }
+                } catch (err) { alert("Invalid Backup File"); }
             };
             reader.readAsText(file);
         }
 
         function screenshotMode() {
             document.getElementById('main-body').classList.add('hide-ui');
-            setTimeout(() => { alert("Take Screenshot Now!"); setTimeout(() => { document.getElementById('main-body').classList.remove('hide-ui'); }, 5000); }, 100);
+            setTimeout(() => { alert("Take Screenshot Now!"); setTimeout(() => { document.getElementById('main-body').classList.remove('hide-ui'); }, 3000); }, 100);
         }
 
         init();
